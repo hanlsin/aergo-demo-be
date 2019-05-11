@@ -271,20 +271,26 @@ function sign1on1Contract(contractId, sign)
     return
   end
 
-  local contractRaw = "" .. row[1] .. rcvAddr .. row[3]
-  system.print(contractRaw)
-
   local issSign = row[5]
   if issSign == 'CANCEL' then
-    contract.event("contract", "sign", txHash, 400, "issuer discarded the contract")
+    contract.event("contract", "sign", txHash, 400,
+      "issuer discarded the contract")
     return
   end
 
   local rcvSign = row[6]
   if rcvSign ~= nil then
-    contract.event("contract", "sign", txHash, 400, "receiver already disagreed or signed")
+    contract.event("contract", "sign", txHash, 400,
+      "receiver already disagreed or signed")
     return
   end
+
+  local contractRaw = "" .. row[1] .. rcvAddr
+  local contents = row[3]
+  if contents ~= nil then
+    contractRaw = contractRaw .. contents
+  end
+  system.print(contractRaw)
 
   -- verify issuer's signature
   local contractHash = crypto.sha256(contractRaw)
