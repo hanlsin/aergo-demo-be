@@ -174,6 +174,28 @@ function createCert(expireAfter)
   return
 end
 
+function getUserCert2(address)
+  local stmt = db.prepare([[SELECT block_no, tx_hash, expire_after
+    FROM demo_cert WHERE address = ? ORDER BY block_no DESC]])
+  local rs = stmt:query(address)
+
+  if rs:next() == false then
+    return {
+      _status_code = 404,
+      _status_msg = "cannot find any certificate"
+    }
+  end
+
+  local row = { rs:get() }
+
+  return {
+    address = address,
+    block_no = row[1],
+    tx_hash = row[2],
+    expire_after = row[3]
+  }
+end
+
 function getUserCert(proof, sign, address)
   local proofHash = crypto.sha256(proof)
   if not crypto.ecverify(proofHash, sign, address) then
@@ -499,6 +521,6 @@ end
 
 abi.register(addNewUser, addRecoveryKey, createCert, addNew1on1Contract,
   sign1on1Contract, cancel1on1Contract, disagree1on1Contract)
-abi.register_view(getVersion, getUserInfo2, getUserInfo, getUserCert,
+abi.register_view(getVersion, getUserInfo2, getUserInfo, getUserCert, getUserCert2,
   getUserRecoveryKeys, get1on1Contract,
   getAll1on1Contract, getAllIssued1on1Contract, getAllReceived1on1Contract)
