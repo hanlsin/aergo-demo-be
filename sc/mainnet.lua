@@ -48,23 +48,23 @@ end
 
 function register1on1Contract(issAddr, rcvAddr, contractId, contractHash)
   local issuer = UserMap[issAddr]
-  table.insert(issuer["issuedContract"], {
+  issuer["issuedContract"][contractId] = {
     receiver = rcvAddr,
     contractId = contractId,
     contractHash = contractHash,
     blockNo = system.getBlockheight(),
     txHash = system.getTxhash()
-  })
+  }
   UserMap[issAddr] = issuer
 
   local receiver = UserMap[rcvAddr]
-  table.insert(receiver["receivedContract"], {
+  receiver["receivedContract"][contractId] = {
     issuer = issAddr,
     contractId = contractId,
     contractHash = contractHash,
     blockNo = system.getBlockheight(),
     txHash = system.getTxhash()
-  })
+  }
   UserMap[rcvAddr] = receiver
 end
 
