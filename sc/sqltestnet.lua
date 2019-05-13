@@ -49,6 +49,7 @@ function constructor()
       contents      TEXT,
       iss_sign      TEXT,
       rcv_sign      TEXT,
+      metadata      TEXT,
       PRIMARY KEY (contract_id),
       FOREIGN KEY (iss_addr) REFERENCES demo_user (address)
         ON DELETE CASCADE ON UPDATE NO ACTION
@@ -272,6 +273,90 @@ function addNew1on1Contract(sign, rcvAddr, contents)
   return
 end
 
+function update1on1ContractByI(contractId, sign, contents)
+  local address = system.getOrigin()
+  local txHash = system.getTxhash()
+
+  local stmt = db.prepare([[SELECT iss_addr, rcv_addr,
+    FROM demo_contract_1on1 WHERE contract_id = ?]])
+  local rs = stmt:query(contractId)
+
+  if rs:next() == false then
+    contract.event("contract", "update", txHash, 404, "cannot find a contract")
+    return
+  end
+
+  local row = { rs:get() }
+  local issAddr = row[1]
+  local rcvAddr = row[2]
+  if address ~= issAddr then
+    contract.event("contract", "update", txHash, 400, "only issuer can update")
+    return
+  end
+
+  local contractRaw = "" .. issAddr .. rcvAddr
+  if contents ~= nil then
+    contractRaw = contractRaw .. contents
+  end
+
+  -- verify issuer's signature
+  local contractHash = crypto.sha256(contractRaw)
+  if not crypto.ecverify(contractHash, sign, address) then
+    contract.event("contract", "update", txHash, 400, "wrong receiver's signature")
+    return
+  end
+
+  local stmt = db.prepare([[UPDATE demo_contract_1on1
+      SET iss_sign = ?, contents = ?
+      WHERE contract_id = ?]])
+  stmt:exec(sign, contents, contractId)
+
+  contract.event("contract", "update", txHash, 201, contractId)
+  return
+end
+
+function update1on1ContractByR(contractId, sign, contents)
+  local address = system.getOrigin()
+  local txHash = system.getTxhash()
+
+  local stmt = db.prepare([[SELECT iss_addr, rcv_addr,
+    FROM demo_contract_1on1 WHERE contract_id = ?]])
+  local rs = stmt:query(contractId)
+
+  if rs:next() == false then
+    contract.event("contract", "update", txHash, 404, "cannot find a contract")
+    return
+  end
+
+  local row = { rs:get() }
+  local issAddr = row[1]
+  local rcvAddr = row[2]
+  if address ~= rcvAddr then
+    contract.event("contract", "update", txHash, 400, "only receiver can update")
+    return
+  end
+
+  local contractRaw = "" .. issAddr .. rcvAddr
+  if contents ~= nil then
+    contractRaw = contractRaw .. contents
+  end
+
+  -- verify issuer's signature
+  local contractHash = crypto.sha256(contractRaw)
+  if not crypto.ecverify(contractHash, sign, address) then
+    contract.event("contract", "update", txHash, 400, "wrong receiver's signature")
+    return
+  end
+
+  local stmt = db.prepare([[UPDATE demo_contract_1on1
+      SET rcv_sign = ?, contents = ?
+      WHERE contract_id = ?]])
+  stmt:exec(sign, contents, contractId)
+
+  contract.event("contract", "update", txHash, 201, contractId)
+  return
+end
+
 function sign1on1Contract(contractId, sign)
   local address = system.getOrigin()
   local txHash = system.getTxhash()
@@ -312,11 +397,9 @@ function sign1on1Contract(contractId, sign)
   if contents ~= nil then
     contractRaw = contractRaw .. contents
   end
-  system.print(contractRaw)
 
   -- verify issuer's signature
   local contractHash = crypto.sha256(contractRaw)
-  system.print(contractHash)
   if not crypto.ecverify(contractHash, sign, address) then
     contract.event("contract", "sign", txHash, 400, "wrong receiver's signature")
     return
@@ -520,7 +603,8 @@ function getAllReceived1on1Contract(rcvAddr)
 end
 
 abi.register(addNewUser, addRecoveryKey, createCert, addNew1on1Contract,
-  sign1on1Contract, cancel1on1Contract, disagree1on1Contract)
+  sign1on1Contract, cancel1on1Contract, disagree1on1Contract,
+  update1on1ContractByI, update1on1ContractByR)
 abi.register_view(getVersion, getUserInfo2, getUserInfo, getUserCert, getUserCert2,
   getUserRecoveryKeys, get1on1Contract,
   getAll1on1Contract, getAllIssued1on1Contract, getAllReceived1on1Contract)
